@@ -61,6 +61,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     normal_distribution<double> N_pos_y(0, std_pos[1]);
     normal_distribution<double> N_pos_theta(0, std_pos[2]);
 
+    // avoid dividing by 0
     if ((yaw_rate<EPS) && (yaw_rate>-EPS)){
         if (yaw_rate<0.0){
             yaw_rate=-EPS;
@@ -93,20 +94,24 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	//   observed measurement to this particular landmark.
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to
 	//   implement this method and use it as a helper during the updateWeights phase.
-	double min_dist, min_dist_test, dx, dy;
+
+	double min_dist2, min_dist2_test, dx, dy;
 	int arg_min_dist;
 	for (unsigned int i=0; i<observations.size(); ++i){
+        // init min to valuse of the first predicted
         arg_min_dist=predicted[0].id;
         dx = observations[i].x - predicted[0].x;
         dy = observations[i].y - predicted[0].y;
-        min_dist = dx*dx + dy*dy;
+        min_dist2 = dx*dx + dy*dy;   // in order to avoid the sqrt we use the dist^2
         for (unsigned int j=1; j<predicted.size(); ++j){
             dx = observations[i].x - predicted[j].x;
             dy = observations[i].y - predicted[j].y;
-            min_dist_test = dx*dx + dy*dy;
-            if (min_dist_test<min_dist){
+            min_dist2_test = dx*dx + dy*dy;
+
+            // check new minimum
+            if (min_dist2_test<min_dist2){
                 arg_min_dist=predicted[j].id;
-                min_dist = min_dist_test;
+                min_dist2 = min_dist2_test;
             }
         }
         observations[i].id=arg_min_dist;
@@ -127,10 +132,12 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   for the fact that the map's y-axis actually points downwards.)
 	//   http://planning.cs.uiuc.edu/node99.html
 
-	double sensor_range_sqr = sensor_range*sensor_range;
+
+	double sensor_range_sqr = sensor_range*sensor_range; // in order to avoid the sqrt we use the dist^2
 	LandmarkObs landOb_tmp;
 	for (int i=0; i<num_particles; ++i){
 
+        // setting predicted vector just with the landmark that are in the sensor_range
         vector<LandmarkObs> predicted;
         double p_x = particles[i].x;
         double p_y = particles[i].y;
@@ -149,6 +156,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             }
         }
 
+        // translate vehicles coordinate to MAP coordinate according to the particles[i] position and angle
         vector<LandmarkObs> observations_on_map;
         for (unsigned int j=0; j<observations.size(); ++j){
             landOb_tmp.id = -1;
@@ -157,9 +165,12 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             observations_on_map.push_back(landOb_tmp);
         }
 
+        // We find nearest neighbor for each observations
         dataAssociation(predicted, observations_on_map);
 
-
+        // clac the new weights. We do it first in the log domain
+        // to replace the exp() and the mult by adds. Only at the end we will take exp(log(weight)) to get the weight
+        // we also ignore the constant of the mult-variate Gaussian distribution
         double log_weight = 0.0;
         double sigx2_inv = 0.5 / (std_landmark[0]*std_landmark[0]);
         double sigy2_inv = 0.5 / (std_landmark[1]*std_landmark[1]);
@@ -184,14 +195,20 @@ void ParticleFilter::resample() {
 	// TODO: Resample particles with replacement with probability proportional to their weight.
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
+
+	// We use the algorithm that was shown in class
 	vector<Particle> resamp_particles;
+	// we get max weight
 	double max_w = *max_element(weights.begin(), weights.end());
 
 	uniform_int_distribution<int> Rnd_idx(0, num_particles-1);
 	uniform_real_distribution<double> Rnd_w(0, 2.0*max_w);
 
-	int idx = Rnd_idx(gen);
-	double beta = 0.0;
+    // "wheel algorithm"
+	int idx = Rnd_idx(gen);  // init
+	double beta = 0.0;       // init
+
+	// finding new particles
 	for (int i=0; i<num_particles; ++i){
         beta += Rnd_w(gen);
         while (weights[idx] < beta){
@@ -201,6 +218,7 @@ void ParticleFilter::resample() {
         resamp_particles.push_back(particles[idx]);
 	}
 
+    // copy them to out class
     particles = resamp_particles;
 }
 
