@@ -64,10 +64,10 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     // avoid dividing by 0
     if ((yaw_rate<EPS) && (yaw_rate>-EPS)){
         if (yaw_rate<0.0){
-            yaw_rate=-EPS;
+            yaw_rate = -EPS;
         }
         else{
-            yaw_rate=EPS;
+            yaw_rate = EPS;
         }
     }
 
@@ -95,10 +95,11 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to
 	//   implement this method and use it as a helper during the updateWeights phase.
 
+	// We find nearest neighbor for each observations
 	double min_dist2, min_dist2_test, dx, dy;
 	int arg_min_dist;
 	for (unsigned int i=0; i<observations.size(); ++i){
-        // init min to valuse of the first predicted
+        // init min to values of the first predicted
         arg_min_dist=predicted[0].id;
         dx = observations[i].x - predicted[0].x;
         dy = observations[i].y - predicted[0].y;
@@ -148,7 +149,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             double mapOb_y = map_landmarks.landmark_list[j].y_f;
             double dx = (p_x-mapOb_x);
             double dy = (p_y-mapOb_y);
-            if ((dx*dx + dy*dy)<=sensor_range_sqr){
+            if ((dx*dx + dy*dy) <= sensor_range_sqr){
                 landOb_tmp.id = map_landmarks.landmark_list[j].id_i;
                 landOb_tmp.x = mapOb_x;
                 landOb_tmp.y = mapOb_y;
